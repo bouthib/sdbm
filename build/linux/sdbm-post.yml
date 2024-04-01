@@ -1,0 +1,16 @@
+---
+# file: sdbm-post.yml
+#
+
+- hosts: all
+  become: yes
+  become_user: root
+
+  tasks:
+ 
+    - name: Remove directory /staging
+      file:
+        path: /staging
+        state: absent
+
+

@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# chkconfig: 345 99 01
+# description: Control script for SDBMSrv
+#
+# Date: 2021/03/03
+#
+
+
+
+SDBM_DIR=/opt/sdbm;
+RETVAL=0
+
+
+
+# Check that sdbmsrvctl exists.
+[ -f $SDBM_DIR/sdbmsrv/sdbmsrvctl ] || exit 0
+
+
+
+start()
+{
+   echo -n $"Starting SDBM - Simple Database Monitoring service."
+   su - oracle -c "$SDBM_DIR/sdbmsrv/sdbmsrvctl start"                    >> /var/log/sdbmsrv 2>&1
+   RETVAL=$?
+   echo
+   if [ -d /var/lock/subsys ] ; then
+      touch /var/lock/subsys/sdbmsrv
+   fi
+   # Load initial target on first boot
+   if [ -f /opt/sdbm/sdbmsrv/sdbmsrv.firstboot ] ; then
+      su - oracle -c "sqlplus -s /nolog @/opt/sdbm/sdbmsrv/sdbmsrv.init.sql"
+      rm -f /opt/sdbm/sdbmsrv/sdbmsrv.firstboot
+   fi
+   return $RETVAL
+}  
+
+stop()
+{
+   echo -n $"Shutting down SDBM - Simple Database Monitoring service."
+   su - oracle -c "$SDBM_DIR/sdbmsrv/sdbmsrvctl stop"                     >> /var/log/sdbmsrv 2>&1
+   RETVAL=$?
+   if [ -f /var/lock/subsys/sdbmsrv ] ; then
+      rm -f /var/lock/subsys/sdbmsrv
+   fi
+   echo
+   return $RETVAL
+}  
+
+
+case "$1" in
+  start)
+   start
+   ;;
+  stop)
+   stop
+   ;;
+  *)
+   echo $"Usage: $0 {start|stop}"
+   exit 1
+esac
+
+exit $?

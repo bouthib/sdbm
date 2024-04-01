@@ -1,0 +1,171 @@
+set echo   off
+set verify off
+whenever OSERROR  EXIT 8 ROLLBACK
+whenever SQLERROR EXIT 8 ROLLBACK
+spool %SDBM_INSTALL_REP_LOG%\SDBMAgtCreateBackupJob.log
+
+
+CONNECT / AS SYSDBA
+alter session set container = XEPDB1;
+
+
+INSERT INTO SDBM.TACHE_AGT
+(
+   NOM_SERVEUR
+  ,NOM_TACHE
+  ,EXECUTABLE
+  ,PARAMETRE
+  ,REPERTOIRE
+  ,REPERTOIRE_JOURNAL
+  ,EXECUTION
+  ,TYPE_NOTIF
+  ,DESTI_NOTIF
+  ,INTERVAL
+  ,DELAI_AVERTISSEMENT
+  ,DH_PROCHAINE_EXEC
+  ,CODE_RETOUR_SUCCES
+)
+VALUES
+(
+   (SELECT UPPER(HOST_NAME) FROM V$INSTANCE)
+  ,'BACKUP_ARCH_SDBM'
+  ,'cmd.exe (/a)'
+  ,'rman-bkarc-sdbm.cmd'
+  ,'&1:\SDBM\_BACKUP\CMD'
+  ,'&1:\SDBM\_BACKUP\LOG'
+  ,'AC'
+  ,'OF'
+  ,'---'
+  ,'TRUNC(SYSDATE,''HH24'') + 1.75/24'
+  ,30
+  ,TRUNC(SYSDATE,'HH24') + 1.75/24
+  ,'{RC} = 0'
+);
+
+INSERT INTO SDBM.TACHE_DET_MSG_AGT
+(
+   NOM_SERVEUR
+  ,NOM_TACHE
+  ,TYPE_MSG
+  ,MSG
+)
+VALUES
+(
+   (SELECT UPPER(HOST_NAME) FROM V$INSTANCE)
+  ,'BACKUP_ARCH_SDBM'
+  ,'ER'
+  ,'ORA-'
+);
+
+INSERT INTO SDBM.TACHE_AGT
+(
+   NOM_SERVEUR
+  ,NOM_TACHE
+  ,EXECUTABLE
+  ,PARAMETRE
+  ,REPERTOIRE
+  ,REPERTOIRE_JOURNAL
+  ,EXECUTION
+  ,TYPE_NOTIF
+  ,DESTI_NOTIF
+  ,INTERVAL
+  ,DELAI_AVERTISSEMENT
+  ,DH_PROCHAINE_EXEC
+  ,CODE_RETOUR_SUCCES
+)
+VALUES
+(
+   (SELECT UPPER(HOST_NAME) FROM V$INSTANCE)
+  ,'BACKUP_FULL_SDBM'
+  ,'cmd.exe (/a)'
+  ,'rman-bkdbs-sdbm.cmd'
+  ,'&1:\SDBM\_BACKUP\CMD'
+  ,'&1:\SDBM\_BACKUP\LOG'
+  ,'AC'
+  ,'OF'
+  ,'---'
+  ,'TRUNC(SYSDATE) + 1 + 12.25/24'
+  ,90
+  ,TRUNC(SYSDATE) + 1 + 12.25/24
+  ,'{RC} = 0'
+);
+
+INSERT INTO SDBM.TACHE_DET_MSG_AGT
+(
+   NOM_SERVEUR
+  ,NOM_TACHE
+  ,TYPE_MSG
+  ,MSG
+)
+VALUES
+(
+   (SELECT UPPER(HOST_NAME) FROM V$INSTANCE)
+  ,'BACKUP_FULL_SDBM'
+  ,'ER'
+  ,'ORA-'
+);
+
+COMMIT;
+
+
+
+--
+-- Restart for ARCHIVELOG
+--
+whenever OSERROR  CONTINUE
+whenever SQLERROR CONTINUE
+
+UPDATE SDBM.PARAMETRE
+   SET STATUT_SERVEUR  = 'IN'
+      ,STATUT_COLLECTE = 'IN';
+
+COMMIT;
+
+
+alter session set container = CDB$ROOT;
+shutdown immediate;
+startup mount;
+alter database archivelog;
+alter database open;
+
+PROMPT
+PROMPT Initializing (30 seconds) ...
+BEGIN
+
+   DBMS_LOCK.SLEEP(30);
+   
+END;
+/
+
+alter session set container = XEPDB1;
+
+UPDATE SDBM.PARAMETRE
+   SET STATUT_SERVEUR  = 'AC'
+      ,STATUT_COLLECTE = 'AC';
+
+COMMIT;
+
+
+--
+-- Enable RMAN backup and archived log backup verification
+--
+INSERT INTO SDBM.EVENEMENT_CIBLE
+(
+   TYPE_CIBLE
+  ,SOUS_TYPE_CIBLE
+  ,NOM_CIBLE
+  ,NOM_EVENEMENT
+)
+SELECT TYPE_CIBLE
+      ,SOUS_TYPE_CIBLE
+      ,'SDBM'
+      ,NOM_EVENEMENT
+  FROM SDBM.EVENEMENT
+ WHERE TYPE_CIBLE      = 'BD'
+   AND SOUS_TYPE_CIBLE = 'OR'
+   AND NOM_EVENEMENT   LIKE 'RMAN_%';
+
+COMMIT;
+
+
+EXIT

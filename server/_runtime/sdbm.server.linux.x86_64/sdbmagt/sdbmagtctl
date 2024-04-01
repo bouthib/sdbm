@@ -1,0 +1,137 @@
+#!/bin/sh
+#
+# 
+# Script :
+#    sdbmagtctl
+#
+# Description :
+#    Control of Java server SDBMAgt.
+#
+
+
+# Schema - multi schema - multi instance install
+SDBM_SCH=SDBM;    export SDBM_SCH;
+SDBM_INS=SDBM;    export SDBM_INS;
+SDBM_NAM=sdbmagt; export SDBM_NAM;
+
+
+# Root directory Java - SDBM
+export JAVA_DIR=/opt/java/jre-sdbm;
+export SDBM_DIR=/opt/sdbm;
+
+
+statusSDBMAgt()
+{
+   if [ `uname` != "SunOS" ] ; then
+
+      # Sauf SunOS - supporte le multi-instance
+      if [ `ps -ef | grep "SDBMAgt $SDBM_SCH $SDBM_INS" | grep -v "grep SDBMAgt $SDBM_SCH $SDBM_INS" | wc -l` != "0" ] ; then
+         echo "SDBMAgt is running."
+      else
+         echo "SDBMAgt is stopped."
+      fi
+
+   else
+
+      # Pour SunOS - ne supporte pas multi-instance
+      if [ `ps -ef | grep "SDBMAgt.jar" | grep -v "grep SDBMAgt.jar" | wc -l` != "0" ] ; then
+         echo "SDBMAgt is running."
+      else
+         echo "SDBMAgt is stopped."
+      fi
+
+   fi
+}
+
+
+startSDBMAgt()
+{
+   if [ `uname` != "SunOS" ] ; then
+
+      # Sauf SunOS - supporte le multi-instance
+      if [ `ps -ef | grep "SDBMAgt $SDBM_SCH $SDBM_INS" | grep -v "grep SDBMAgt $SDBM_SCH $SDBM_INS" | wc -l` != "0" ] ; then
+         echo "SDBMAgt is already running."
+      else
+         cd $SDBM_DIR/$SDBM_NAM;
+         if [ -f $SDBM_DIR/$SDBM_NAM/nohup.out ] ; then
+            rm -f $SDBM_DIR/$SDBM_NAM/nohup.out
+         fi
+
+         nohup $JAVA_DIR/bin/java -server -classpath ".:./SDBMAgt.jar:./../jdbc/{{ jdbc_ora_file }}:./sigar/sigar.jar:" SDBMAgt $SDBM_SCH $SDBM_INS & > /dev/null 2>&1
+         sleep 1
+         statusSDBMAgt      
+      fi
+   
+   else
+   
+      # Pour SunOS - ne supporte pas multi-instance
+      if [ `ps -ef | grep "SDBMAgt.jar" | grep -v "grep SDBMAgt.jar" | wc -l` != "0" ] ; then
+         echo "SDBMAgt is already running."
+      else
+         cd $SDBM_DIR/$SDBM_NAM;
+         if [ -f $SDBM_DIR/$SDBM_NAM/nohup.out ] ; then
+            rm -f $SDBM_DIR/$SDBM_NAM/nohup.out
+         fi
+
+         nohup $JAVA_DIR/bin/java -server -classpath ".:./SDBMAgt.jar:./../jdbc/{{ jdbc_ora_file }}:./sigar/sigar.jar:" SDBMAgt $SDBM_SCH & > /dev/null 2>&1
+         sleep 1
+         statusSDBMAgt      
+      fi
+
+   fi
+}
+
+
+stopSDBMAgt()
+{
+   if [ `uname` != "SunOS" ] ; then
+
+      # Sauf SunOS - supporte le multi-instance
+      if [ `ps -ef | grep "SDBMAgt $SDBM_SCH $SDBM_INS" | grep -v "grep SDBMAgt $SDBM_SCH $SDBM_INS" | wc -l` != "1" ] ; then
+         echo "SDBMAgt is not running."
+      else
+         pidSDBMAgt=`ps -ef | grep "SDBMAgt $SDBM_SCH $SDBM_INS" | grep -v "grep SDBMAgt $SDBM_SCH $SDBM_INS" | awk '{print $2}'`
+         kill $pidSDBMAgt
+         echo PID $pidSDBMAgt has been signal to stop.
+         sleep 3
+         statusSDBMAgt      
+      fi
+
+   else
+   
+      # Pour SunOS - ne supporte pas multi-instance
+      if [ `ps -ef | grep "SDBMAgt.jar" | grep -v "grep SDBMAgt.jar" | wc -l` != "1" ] ; then
+         echo "SDBMAgt is not running."
+      else
+         pidSDBMAgt=`ps -ef | grep "SDBMAgt.jar" | grep -v "grep SDBMAgt.jar" | awk '{print $2}'`
+         kill $pidSDBMAgt
+         echo PID $pidSDBMAgt has been signal to stop.
+         sleep 3
+         statusSDBMAgt      
+      fi
+
+   fi
+}
+
+
+
+# See how we were called.
+case "$1" in
+
+   status)
+      statusSDBMAgt
+      ;;
+ 
+   start)
+      startSDBMAgt
+      ;;
+
+   stop)
+      stopSDBMAgt
+      ;;
+
+   *)
+      echo "Usage: $0 {start|stop|status}"
+      exit 1
+ 
+esac

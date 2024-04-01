@@ -1,0 +1,12 @@
+[Unit]
+Description=Script to handle sdbmdac as a service (SDBM)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/opt/sdbm/sdbmdac/sdbmdac start
+ExecStop=/opt/sdbm/sdbmdac/sdbmdac stop
+
+[Install]
+WantedBy=default.target

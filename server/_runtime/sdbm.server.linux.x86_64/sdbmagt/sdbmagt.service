@@ -1,0 +1,12 @@
+[Unit]
+Description=Script to handle sdbmagt as a service (SDBM)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/opt/sdbm/sdbmagt/sdbmagt start
+ExecStop=/opt/sdbm/sdbmagt/sdbmagt stop
+
+[Install]
+WantedBy=default.target

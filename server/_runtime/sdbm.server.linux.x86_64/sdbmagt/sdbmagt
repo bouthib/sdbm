@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# chkconfig: 345 99 01
+# description: Control script for SDBMAgt
+#
+# Date: 2009/01/23
+#
+
+
+
+SDBM_DIR=/opt/sdbm;
+RETVAL=0
+
+
+
+# Check that sdbmagtctl exists.
+[ -f $SDBM_DIR/sdbmagt/sdbmagtctl ] || exit 0
+
+
+
+start()
+{
+   echo -n $"Starting SDBM - Simple Database Monitoring Agent service."
+   su - oracle -c "$SDBM_DIR/sdbmagt/sdbmagtctl start" >> /var/log/sdbmagt 2>&1
+   RETVAL=$?
+   echo
+   if [ -d /var/lock/subsys ] ; then
+      touch /var/lock/subsys/sdbmagt
+   fi
+   return $RETVAL
+}  
+
+stop()
+{
+   echo -n $"Shutting down SDBM - Simple Database Monitoring Agent service."
+   su - oracle -c "$SDBM_DIR/sdbmagt/sdbmagtctl stop" >> /var/log/sdbmagt 2>&1
+   RETVAL=$?
+   if [ -f /var/lock/subsys/sdbmagt ] ; then
+      rm -f /var/lock/subsys/sdbmagt
+   fi
+   echo
+   return $RETVAL
+}  
+
+
+case "$1" in
+  start)
+   start
+   ;;
+  stop)
+   stop
+   ;;
+  *)
+   echo $"Usage: $0 {start|stop}"
+   exit 1
+esac
+
+exit $?

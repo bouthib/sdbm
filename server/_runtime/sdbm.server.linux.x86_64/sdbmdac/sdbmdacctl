@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# 
+# Script :
+#    sdbmdacctl
+#
+# Description :
+#    Control of Java server SDBMDaC.
+#
+
+
+# Schema - multi schema install
+export SDBM_SCH=SDBM;
+
+# Root directory Java - SDBM
+export JAVA_DIR=/opt/java/jre-sdbm;
+export SDBM_DIR=/opt/sdbm;
+
+
+statusSDBMDaC()
+{
+   if [ `ps -ef | grep "SDBMDaC $SDBM_SCH" | grep -v "grep SDBMDaC $SDBM_SCH" | wc -l` -gt 0 ] ; then
+      echo "SDBMDaC is running."
+   else
+      echo "SDBMDaC is stopped."
+   fi
+}
+
+
+startSDBMDaC()
+{
+   if [ `ps -ef | grep "SDBMDaC $SDBM_SCH" | grep -v "grep SDBMDaC $SDBM_SCH" | wc -l` -gt 0 ] ; then
+      echo "SDBMDaC is already running."
+   else
+      cd $SDBM_DIR/sdbmdac;
+      if [ -f $SDBM_DIR/sdbmdac/nohup.out ] ; then
+         rm -f $SDBM_DIR/sdbmdac/nohup.out
+      fi
+
+      # Starting HangCheck monitor...
+      nohup ./SDBMDaC.sh $SDBM_SCH & > /dev/null 2>&1
+      sleep 1
+      statusSDBMDaC      
+   fi
+}
+
+
+stopSDBMDaC()
+{
+   if [ `ps -ef | grep "./SDBMDaC.sh $SDBM_SCH" | grep -v "grep ./SDBMDaC.sh $SDBM_SCH" | wc -l` -lt 1 ] ; then
+      echo "SDBMDaC is not running."
+   else
+      pidSDBMDaC=$(ps -ef | grep "./SDBMDaC.sh $SDBM_SCH" | grep -v "grep ./SDBMDaC.sh $SDBM_SCH" | awk '{print $2}')
+      kill $pidSDBMDaC
+      echo PID $pidSDBMDaC has been signal to stop.
+      sleep 3
+      statusSDBMDaC      
+   fi
+}
+
+
+
+# See how we were called.
+case "$1" in
+
+   status)
+      statusSDBMDaC
+      ;;
+ 
+   start)
+      startSDBMDaC
+      ;;
+
+   stop)
+      stopSDBMDaC
+      ;;
+
+   *)
+      echo "Usage: $0 {start|stop|status}"
+      exit 1
+ 
+esac

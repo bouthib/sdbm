@@ -1,0 +1,45 @@
+---
+# file:
+#    ojdbc5.yml
+#
+# Description:
+#    Remplace ojdbc8.jar by ojdbc5.jar to allow monitoring of Oracle 9 databases
+#
+
+- hosts: all
+  become: yes
+  become_user: root
+
+  tasks:
+ 
+  - name: Get JDBC drivers
+    copy:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/jdbc/{{ item }}
+      dest: /staging/{{ item }}
+      owner: oracle
+      group: oinstall
+      mode: '0644'
+    register: get_ojdbc
+    with_items:
+      - "{{ jdbc_ora_file5 }}"
+
+  - name: Replace jdbc/ojdbc8.jar by jdbc/ojdbc5.jar in /opt/sdbm/sdbmsrv/SDBMSrv.sh and /opt/sdbm/sdbmdac/SDBMDaC.sh
+    replace:
+      path: "{{ item }}"
+      regexp: "jdbc/ojdbc8.jar"
+      replace: "jdbc/ojdbc5.jar"
+    with_items:
+      - /opt/sdbm/sdbmsrv/SDBMSrv.sh
+      - /opt/sdbm/sdbmdac/SDBMDaC.sh
+    register: replace_ojdbc
+
+  - name: Restart all service to use ojdbc5
+    systemd:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+      - sdbmsrv
+      - sdbmdac
+    when: get_ojdbc.changed or replace_ojdbc.changed
+
+

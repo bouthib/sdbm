@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# chkconfig: 345 99 01
+# description: Control script for SDBMDaC
+#
+# Date: 2008/12/23
+#
+
+
+
+SDBM_DIR=/opt/sdbm;
+RETVAL=0
+
+
+
+# Check that sdbmdacctl exists.
+[ -f $SDBM_DIR/sdbmdac/sdbmdacctl ] || exit 0
+
+
+
+start()
+{
+   echo -n $"Starting SDBM - Simple Database Monitoring DataCollector service."
+   su - oracle -c "$SDBM_DIR/sdbmdac/sdbmdacctl start"                    >> /var/log/sdbmdac 2>&1
+   RETVAL=$?
+   echo
+   if [ -d /var/lock/subsys ] ; then
+      touch /var/lock/subsys/sdbmdac
+   fi
+   return $RETVAL
+}  
+
+stop()
+{
+   echo -n $"Shutting down SDBM - Simple Database Monitoring DataCollector service."
+   su - oracle -c "$SDBM_DIR/sdbmdac/sdbmdacctl stop"                     >> /var/log/sdbmdac 2>&1
+   RETVAL=$?
+   if [ -f /var/lock/subsys/sdbmdac ] ; then
+      rm -f /var/lock/subsys/sdbmdac
+   fi
+   echo
+   return $RETVAL
+}  
+
+
+case "$1" in
+  start)
+   start
+   ;;
+  stop)
+   stop
+   ;;
+  *)
+   echo $"Usage: $0 {start|stop}"
+   exit 1
+esac
+
+exit $?

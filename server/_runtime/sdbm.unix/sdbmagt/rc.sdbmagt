@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# description: Control script for SDBMAgt
+#
+# Date: 2009/01/26
+#
+
+
+
+SDBM_DIR=/opt/sdbm;
+RETVAL=0
+
+
+
+# Check that sdbmagtctl exists.
+[ -f $SDBM_DIR/sdbmagt/sdbmagtctl ] || exit 0
+
+
+
+startSDBM()
+{
+   echo "Starting SDBM - Simple Database Monitoring Agent service."
+   su - oracle -c "$SDBM_DIR/sdbmagt/sdbmagtctl start" >> /var/adm/log/sdbmagt 2>&1
+   RETVAL=$?
+   return $RETVAL
+}  
+
+stopSDBM()
+{
+   echo "Shutting down SDBM - Simple Database Monitoring Agent service."
+   su - oracle -c "$SDBM_DIR/sdbmagt/sdbmagtctl stop" >> /var/adm/log/sdbmagt 2>&1
+   RETVAL=$?
+   return $RETVAL
+}  
+
+
+case "$1" in
+  start)
+   startSDBM
+   ;;
+  stop)
+   stopSDBM
+   ;;
+  *)
+   echo $"Usage: $0 {start|stop}"
+   exit 1
+esac
+
+exit $?

@@ -1,0 +1,1157 @@
+---
+# file:
+#    sdbm.yml
+#
+# Description:
+#    Install a SDBM server on Oracle Linux
+#     - Oracle XE Database
+#     - Oracle APEX
+#     - Oracle ORDS
+#     - SDBMSrv : Monitoring server
+#     - SDBMDaC : Data Capture server
+#     - SDBMAgt : Logfile monitoring and job scheduling agent
+#
+# Prerequisite:
+#    ansible-galaxy collection install ansible.posix
+#
+
+- hosts: all
+  become: yes
+  become_user: root
+
+  tasks:
+ 
+  - name: Install Oracle EPEL if oracle_epel tag is present
+    yum:
+      name: oracle-epel-release-el{{ ansible_distribution_major_version }}
+      state: latest
+    tags: [ 'never', 'oracle_epel' ]
+
+
+  - name: Install base OS utilities - common
+    yum:
+      name:
+      - telnet
+      - unzip
+      - wget
+      state: latest
+
+  - name: Install base OS utilities
+    yum:
+      name:
+      - python3-libsemanage 
+      state: latest
+
+
+  - name: Install nginx
+    yum:
+      name:
+      - nginx
+      state: latest
+
+
+  - name: Ensure group oinstall exists
+    group:
+      name: oinstall
+      state: present
+
+  - name: Create directory /staging
+    file:
+      path: /staging
+      state: directory
+      owner: root
+      group: oinstall
+      mode: '0775'
+
+
+  - name: Check if OpenJDK exists - ORDS - required
+    stat:
+      path: "/staging/{{ java_file }}"
+    register: stat_OpenJDK
+
+  - name: Get OpenJDK (if required) - ORDS
+    get_url:
+      url: "{{ java_url }}"
+      dest: "/staging/{{ java_file }}"
+      mode: '0644'
+      timeout: 60
+    when: not stat_OpenJDK.stat.exists
+
+
+  - name: Check if OpenJDK exists - SDBM - optional
+    stat:
+      path: "/staging/{{ java_sdbm_file | default(java_file) }}"
+    register: stat_OpenJDK_sdbm
+
+  - name: Get OpenJDK (if required) - SDBM
+    get_url:
+      url: "{{ java_sdbm_url | default(java_url) }}"
+      dest: "/staging/{{ java_sdbm_file | default(java_file) }}"
+      mode: '0644'
+      timeout: 60
+    when: not stat_OpenJDK_sdbm.stat.exists
+
+
+  - name: Check if /opt/oracle/oradata/XE exists (don't download database rpm if not required)
+    stat:
+      path: /opt/oracle/oradata/XE
+    register: stat_oradataXE
+
+  - name: Check if oracle-database-xe exists
+    stat:
+      path: "/staging/{{ oraclexe_file }}"
+    register: stat_oracledatabasexe
+
+  - name: Get oracle-database-xe (if required)
+    get_url:
+      url: "{{ oraclexe_url }}"
+      dest: "/staging/{{ oraclexe_file }}"
+      mode: '0644'
+      timeout: 60
+    when: not stat_oradataXE.stat.exists and not stat_oracledatabasexe.stat.exists
+
+
+  - name: Check if apex exists
+    stat:
+      path: "/staging/{{ oracleapex_file }}"
+    register: stat_apex
+
+  - name: Get apex (if required)
+    get_url:
+      url: "{{ oracleapex_url }}"
+      dest: "/staging/{{ oracleapex_file }}"
+      mode: '0644'
+      timeout: 60
+    when: not stat_apex.stat.exists
+
+
+  - name: Check if ords exists
+    stat:
+      path: "/staging/{{ oracleords_file }}"
+    register: stat_ords
+
+  - name: Get ords (if required)
+    get_url:
+      url: "{{ oracleords_url }}"
+      dest: "/staging/{{ oracleords_file }}"
+      mode: '0644'
+      timeout: 60
+    when: not stat_ords.stat.exists
+
+
+  - name: Ensure group oinstall with gid={{ oinstall_gid }} exists - oinstall_gid is defined
+    group:
+      gid: "{{ oinstall_gid }}"
+      name: oinstall
+      state: present
+    when: oinstall_gid is defined
+
+  - name: Ensure group oinstall exists - oinstall_gid is not defined
+    group:
+      name: oinstall
+      state: present
+    when: oinstall_gid is not defined
+
+  - name: Ensure group dba with gid={{ dba_gid }} exists - dba_gid is defined
+    group:
+      gid: "{{ dba_gid }}"
+      name: dba
+      state: present
+    when: dba_gid is defined
+
+  - name: Ensure group dba exists - dba_gid is not defined
+    group:
+      name: dba
+      state: present
+    when: dba_gid is not defined
+
+  - name: Ensure user oracle with uid={{ oracle_uid }} exists and is part of oinstall and dba groups - oracle_uid is defined
+    user:
+      uid: "{{ oracle_uid }}"
+      name: oracle
+      groups: oinstall,dba
+      append: yes
+    when: oracle_uid is defined
+
+  - name: Ensure user oracle exists and is part of oinstall and dba groups - oracle_uid is not defined
+    user:
+      name: oracle
+      groups: oinstall,dba
+      append: yes
+    when: oracle_uid is not defined
+
+
+  - name: Get JDBC drivers
+    copy:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/jdbc/{{ item }}
+      dest: /staging/{{ item }}
+      owner: oracle
+      group: oinstall
+      mode: '0644'
+    with_items:
+      - "{{ jdbc_ora_file }}"
+      - "{{ jdbc_mss_file }}" 
+      - "{{ jdbc_mys_file }}" 
+
+
+  - name: Get if firewalld is running
+    shell: firewall-cmd --state
+    register: firewalld_status
+    failed_when: firewalld_status.stdout != 'running' and firewalld_status.stderr != 'not running'
+    changed_when: false
+
+  - name: Get current firewalld zone
+    shell: firewall-cmd --get-active-zones | head -n 1
+    register: firewalld_zone
+    changed_when: false
+    when: firewalld_status.stdout == 'running'
+
+  - name: Add redirect of port 80 to port 8080 to firewalld - current zone {{ firewalld_zone.stdout }}
+    firewalld:
+      rich_rule: rule family=ipv4 forward-port port=80 protocol=tcp to-port=8080
+      zone: "{{ firewalld_zone.stdout }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    when: firewalld_status.stdout == 'running'
+
+  - name: Add http service (port 80) to firewalld - current zone {{ firewalld_zone.stdout }}
+    firewalld:
+      service: http
+      zone: "{{ firewalld_zone.stdout }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    when: firewalld_status.stdout == 'running'
+
+  - name: Add https service (port 443) to firewalld - current zone {{ firewalld_zone.stdout }}
+    firewalld:
+      service: https
+      zone: "{{ firewalld_zone.stdout }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    when: firewalld_status.stdout == 'running'
+
+  - name: Add SQL*Net service (port 1521) to firewalld - current zone {{ firewalld_zone.stdout }} - apex_insta_type = full
+    firewalld:
+      port: 1521/tcp
+      zone: "{{ firewalld_zone.stdout }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    when: firewalld_status.stdout == 'running' and apex_insta_type is defined and apex_insta_type == "full"
+
+
+  - name: Install prerequisites for Oracle XE - OracleLinux
+    yum:
+      name: oracle-database-preinstall-{{ oraclexe_version }}
+      state: latest
+    when: ansible_distribution == 'OracleLinux'
+
+  - name: Install prerequisites for Oracle XE - others - {{ oraclexe_preinstall_url }}
+    yum:
+      name: "{{ oraclexe_preinstall_urls }}"
+      state: present
+    when: ansible_distribution != 'OracleLinux'
+
+
+  - name: Verify that /opt/oracle owner is oracle user
+    file:
+      path: /opt/oracle
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Install oracle-database-xe-{{ oraclexe_version }} (from /staging)
+    yum:
+      name: "/staging/{{ oraclexe_file }}"
+      state: present
+    register: yum_oraclexe
+    when: not stat_oradataXE.stat.exists
+
+  - name: Remove file /staging/{{ oraclexe_file }}
+    file:
+      path: "/staging/{{ oraclexe_file }}"
+      state: absent
+
+  - name: Add the password to the configuration /etc/sysconfig/{{ oraclexe_config }}.conf
+    lineinfile:
+      path: /etc/sysconfig/{{ oraclexe_config }}.conf
+      line: ORACLE_PASSWORD={{ oracle_password }}
+    when: not stat_oradataXE.stat.exists
+
+  - name: Update /etc/init.d/{{ oraclexe_config }} to use 60% of the memory (make it work with Free Tier VM on Oracle Cloud - 971MB... Thanks Oracle !
+    lineinfile:
+      path: /etc/init.d/{{ oraclexe_config }}
+      regexp: '^       #40 percent of physical memory'
+      line: '       #60 percent of physical memory'
+      backup: yes
+
+  - name: Update /etc/init.d/{{ oraclexe_config }} to use 60% of the memory (make it work with Free Tier VM on Oracle Cloud - 971MB... Thanks Oracle !
+    lineinfile:
+      path: /etc/init.d/{{ oraclexe_config }}
+      regexp: '^       dbmem=\$\(\( 40\*\${str\[1\]}/100 \)\)'
+      line: '       dbmem=$(( 60*${str[1]}/100 ))'
+
+  - name: Check if /opt/oracle/oradata/XE/system01.dbf exists (don't run configure if it is not required)
+    stat:
+      path: /opt/oracle/oradata/XE/system01.dbf
+    register: stat_oradataXEsystem01dbf
+
+  - name: Execute the /etc/init.d/{{ oraclexe_config }} configure command (version 8)
+    shell:
+      cmd: /etc/init.d/{{ oraclexe_config }} configure \>\> /tmp/XE.configure.silentinstall.log 2\>\&
+    when: not stat_oradataXEsystem01dbf.stat.exists and ansible_distribution_major_version == '8'
+
+  - name: Execute the /etc/init.d/{{ oraclexe_config }} configure command (version 9 with export CV_ASSUME_DISTID=OEL8.9)
+    shell: |
+      export CV_ASSUME_DISTID=OEL8.9
+      /etc/init.d/{{ oraclexe_config }} configure \>\> /tmp/XE.configure.silentinstall.log 2\>\&
+    when: not stat_oradataXEsystem01dbf.stat.exists and ansible_distribution_major_version == '9'
+
+  - name: Add the password to the configuration /etc/sysconfig/{{ oraclexe_config }}.conf
+    lineinfile:
+      path: /etc/sysconfig/{{ oraclexe_config }}.conf
+      line: ORACLE_PASSWORD={{ oracle_password }}
+      state: absent
+    when: not stat_oradataXE.stat.exists
+
+  - name: Enable startup of database on boot
+    systemd:
+      name: "{{ oraclexe_config }}"
+      daemon_reload: yes 
+      enabled: yes
+
+
+  - name: Add SQLNET.ALLOWED_LOGON_VERSION_SERVER=8 to /opt/oracle/product/{{ oraclexe_version }}/dbhomeXE/network/admin/sqlnet.ora
+    lineinfile:
+      path: /opt/oracle/product/{{ oraclexe_version }}/dbhomeXE/network/admin/sqlnet.ora
+      line: SQLNET.ALLOWED_LOGON_VERSION_SERVER=8
+      create: yes
+      owner: oracle
+      group: oinstall
+      mode: '0644'
+
+
+  - name: Install wallet-smtp to allow starttls
+    file:
+      path: /opt/oracle/admin/wallet-smtp
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0700'
+
+  - name: Install wallet files into /opt/oracle/admin/wallet-smtp (with gmail.com CA already loaded, actual password is welcome1)
+    copy:
+      src: wallet-smtp/{{ item }}
+      dest: /opt/oracle/admin/wallet-smtp/{{ item }}
+      owner: oracle
+      group: oinstall
+      mode: '0600'
+    with_items:
+      - cwallet.sso
+      - ewallet.p12 
+
+
+  - name: Add . oraenv <<< XE to /home/oracle/.bash_profile
+    lineinfile:
+      path: /home/oracle/.bash_profile
+      line: . oraenv <<< XE > /dev/null
+
+
+  - name: Install getSQLResult.sh into /home/oracle
+    copy:
+      src: getSQLResult.sh
+      dest: /home/oracle/getSQLResult.sh
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Get actual APEX version (if already installed)
+    shell: 
+      /home/oracle/getSQLResult.sh 'SELECT VERSION_NO FROM APEX_RELEASE;'
+    changed_when: false
+    failed_when:
+      - '"ORA-"          in shell_apexVersion.stdout'
+      - '"ORA-00942" not in shell_apexVersion.stdout'
+    become: yes
+    become_user: oracle
+    register: shell_apexVersion
+
+  - debug:
+      msg: The APEX actual version is {{ shell_apexVersion.stdout }}
+
+  - name: Extract "/staging/{{ oracleapex_file }}"
+    unarchive:
+      src: "/staging/{{ oracleapex_file }}"
+      dest: /staging
+      remote_src: yes
+    become: yes
+    become_user: oracle
+    when: shell_apexVersion.stdout != oracleapex_version
+
+  - name: Prepare Oracle APEX installation script - apex_insta_type = runtime
+    copy:
+      dest: /staging/apexInstall.sql
+      content: |
+        ALTER SESSION SET CONTAINER = XEPDB1;
+        @apxrtins.sql sysaux sysaux temp /i/
+        @apex_rest_config_core.sql @ {{ apex_password }} {{ apex_password }}
+        exit
+      owner: oracle
+      group: oinstall
+      mode: '0600'
+    when: shell_apexVersion.stdout != oracleapex_version and ((apex_insta_type is not defined) or (apex_insta_type == "runtime"))
+
+  - name: Prepare Oracle APEX installation script - apex_insta_type = full
+    copy:
+      dest: /staging/apexInstall.sql
+      content: |
+        ALTER SESSION SET CONTAINER = XEPDB1;
+        @apexins.sql sysaux sysaux temp /i/
+
+        BEGIN
+           APEX_UTIL.set_security_group_id(10);
+           APEX_UTIL.create_user(p_user_name       => 'ADMIN'
+                                ,p_email_address   => 'admin'
+                                ,p_web_password    => '{{ apex_password }}'
+                                ,p_developer_privs => 'ADMIN'
+                                );
+                                                
+           APEX_UTIL.set_security_group_id(null);
+           COMMIT;
+        END;
+        /
+
+        @apex_rest_config_core.sql @ {{ apex_password }} {{ apex_password }}
+        exit
+      owner: oracle
+      group: oinstall
+      mode: '0600'
+    when: shell_apexVersion.stdout != oracleapex_version and (apex_insta_type == "full")
+
+  - name: Install APEX in the Oracle XE database
+    shell: 
+      su - oracle -c "source /home/oracle/.bash_profile && cd /staging/apex && sqlplus / as sysdba @/staging/apexInstall.sql" > /staging/apexInstall.log 2>&1
+    args:
+      warn: false
+    when: shell_apexVersion.stdout != oracleapex_version
+
+  - name: Delete /tmp/apexInstall.sql (if existing)
+    file:
+      dest: /staging/apexInstall.sql
+      state: absent
+
+
+  - name: Create directory /opt/java
+    file:
+      path: /opt/java
+      state: directory
+      mode: '0755'
+
+  - name: Install Java - ORDS - default
+    unarchive:
+      src: /staging/{{ java_file }}
+      dest: /opt/java/
+      remote_src: yes
+      creates: /opt/java/{{ java_dir }}
+
+  - name: Install Java - SDBM - optional
+    unarchive:
+      src: /staging/{{ java_sdbm_file | default(java_file) }}
+      dest: /opt/java/
+      remote_src: yes
+      creates: /opt/java/{{ java_sdbm_dir | default(java_dir) }}
+
+  - name: Create softlink /opt/java/jre for /opt/java/{{ java_dir }}
+    file:
+      src: /opt/java/{{ java_dir }}
+      dest: /opt/java/jre
+      state: link
+
+  - name: Create softlink /opt/java/jre-sdbm for /opt/java/{{ java_sdbm_dir | default(java_dir) }}
+    file:
+      src: /opt/java/{{ java_sdbm_dir | default(java_dir) }}
+      dest: /opt/java/jre-sdbm
+      state: link
+
+
+  - name: Create directory /opt/oracle/product/ords
+    file:
+      path: /opt/oracle/product/ords
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Create directory /opt/oracle/product/ords.config
+    file:
+      path: /opt/oracle/product/ords.config
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Install ORDS
+    unarchive:
+      src: /staging/{{ oracleords_file }}
+      dest: /opt/oracle/product/ords 
+      owner: oracle
+      group: oinstall
+      remote_src: yes
+      creates: /opt/oracle/product/ords/ords.war
+    register: install_ords
+
+
+  - name: Create directory /opt/oracle/product/apex/images
+    file:
+      path: /opt/oracle/product/apex/images
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Check if /opt/oracle/product/apex/images/apex/ exists
+    stat:
+      path: /opt/oracle/product/apex/images/apex/
+    register: stat_images_apex
+
+  - name: Copy the APEX images
+    copy:
+      src: "/staging/apex/images/"
+      dest: "/opt/oracle/product/apex/images/"
+      owner: oracle
+      group: oinstall
+      remote_src: yes
+    when: not stat_images_apex.stat.exists
+
+
+  - name: Check if database password has already been changed
+    stat:
+      path: "/opt/oracle/product/ords.config/changePassword.log"
+    register: stat_changePassword
+
+  - name: Prepare script to change database passwords for ORDS install
+    copy:
+      dest: /opt/oracle/product/ords.config/changePassword.sql
+      content: |
+        ALTER SESSION SET CONTAINER = XEPDB1;
+        ALTER PROFILE DEFAULT LIMIT PASSWORD_LIFE_TIME UNLIMITED;
+        ALTER USER APEX_LISTENER         IDENTIFIED BY "{{ apex_service_password }}" ACCOUNT UNLOCK;
+        ALTER USER APEX_PUBLIC_USER      IDENTIFIED BY "{{ apex_service_password }}" ACCOUNT UNLOCK;
+        ALTER USER APEX_REST_PUBLIC_USER IDENTIFIED BY "{{ apex_service_password }}" ACCOUNT UNLOCK;
+        /* ORA-01918: user 'ORDS_PUBLIC_USER' does not exist est acceptable */
+        ALTER USER ORDS_PUBLIC_USER      IDENTIFIED BY "{{ apex_service_password }}" ACCOUNT UNLOCK;
+        exit
+      owner: oracle
+      group: oinstall
+      mode: '0600'
+    when: not stat_changePassword.stat.exists
+
+  - name: Execute script to change database passwords for ORDS install
+    shell: 
+      su - oracle -c "source /home/oracle/.bash_profile && sqlplus / as sysdba @/opt/oracle/product/ords.config/changePassword.sql" > /opt/oracle/product/ords.config/changePassword.log 2>&1
+    args:
+      warn: false
+    when: not stat_changePassword.stat.exists
+
+  - name: Delete /opt/oracle/product/ords.config/changePassword.sql (if existing)
+    file:
+      dest: /opt/oracle/product/ords.config/changePassword.sql
+      state: absent
+
+
+  - name: Prepare password for ORDS silent configuration
+    copy:
+      content: |
+        {{ oracle_password }}  
+        {{ apex_service_password }}
+      dest: /opt/oracle/product/ords.config/.password
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+
+  - name: Configure ORDS in silent mode (setup)
+    shell:
+      cmd: |
+        export JAVA_HOME=/opt/java/jre;
+        export PATH=$PATH:$JAVA_HOME/bin:/opt/oracle/product/ords/bin
+        ords --config /opt/oracle/product/ords.config install --admin-user SYS --proxy-user --proxy-user-tablespace SYSAUX --schema-tablespace SYSAUX --feature-rest-enabled-sql false --feature-sdw false --db-hostname localhost --db-port 1521 --db-servicename XEPDB1 --log-folder /opt/oracle/product/ords.config --password-stdin < /opt/oracle/product/ords.config/.password                                                                                     > /opt/oracle/product/ords.config/ords-config.log
+        ords --config /opt/oracle/product/ords.config config set standalone.http.port           8080                              >> /opt/oracle/product/ords.config/ords-config.log
+        ords --config /opt/oracle/product/ords.config config set standalone.static.context.path /i                                >> /opt/oracle/product/ords.config/ords-config.log
+        ords --config /opt/oracle/product/ords.config config set standalone.static.path         /opt/oracle/product/apex/images/  >> /opt/oracle/product/ords.config/ords-config.log
+        ords --config /opt/oracle/product/ords.config config set standalone.context.path        /ords                             >> /opt/oracle/product/ords.config/ords-config.log
+    become: yes
+    become_user: oracle
+
+  - name: Delete /opt/oracle/product/ords.config/.password
+    file:
+      dest: /opt/oracle/product/ords.config/.password
+      state: absent
+
+
+  - name: Create directory /opt/oracle/product/ords.script
+    file:
+      path: /opt/oracle/product/ords.script
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Add ords service related scripts
+    template:
+      src: "{{ item }}"
+      dest: "/opt/oracle/product/ords.script/{{ item }}"
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+    with_items:
+      - ords-service-start.sh
+      - ords-service-stop.sh
+      - ords-start.sh
+      - ords-stop.sh 
+
+  - name: Add ords service configuration script
+    template:
+      src: ords.service
+      dest: /etc/systemd/system/ords.service
+      owner: root
+      group: root
+      mode: '0644'
+    register: ords_service_conf
+
+  - name: Enable and start ORDS service
+    systemd:
+      enabled: yes
+      state: started
+      daemon_reload: yes
+      name: ords
+    when: ords_service_conf.changed
+
+
+  - name: Create directory /opt/sdbm-update-ip
+    file:
+      path: /opt/sdbm-update-ip
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Add sdbm-update-ip.sh script
+    template:
+      src: sdbm-update-ip.sh
+      dest: /opt/sdbm-update-ip/sdbm-update-ip.sh
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Add sdbm-update-ip service configuration script
+    copy:
+      src: files/sdbm-update-ip.service
+      dest: /etc/systemd/system/sdbm-update-ip.service
+      owner: root
+      group: root
+      mode: '0644'
+    register: sdbm_update_ip_service_conf
+
+  - name: Enable and start sdbm-update-ip service
+    systemd:
+      enabled: yes
+      state: restarted
+      daemon_reload: yes
+      name: sdbm-update-ip
+    when: sdbm_update_ip_service_conf.changed
+
+
+  - name: Allow nginx to connect to database
+    ansible.posix.seboolean:
+      name: httpd_can_network_connect
+      state: yes
+      persistent: yes
+    when: firewalld_status.stderr != 'not running'
+
+  - name: Add SDBM nginx configuration
+    copy:
+      src: files/nginx/sdbm.conf
+      dest: /etc/nginx/conf.d/
+      owner: root
+      group: root
+      mode: '0644'
+    register: nginx_default_conf
+
+  - name: Add SDBM favicon.ico file
+    copy:
+      src: files/nginx/favicon.ico
+      dest: /usr/share/nginx/html/favicon.ico
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Update default nginx configuration
+    copy:
+      src: files/nginx/nginx.conf
+      dest: /etc/nginx/
+      owner: root
+      group: root
+      mode: '0644'
+    register: nginx_sdbm_conf
+
+  - name: Enable and start nginx
+    systemd:
+      enabled: yes
+      state: restarted
+      name: nginx
+    when: nginx_default_conf.changed or nginx_sdbm_conf.changed
+
+
+  - name: Create directory /opt/sdbm
+    file:
+      path: /opt/sdbm
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Create directory /opt/sdbm/jdbc
+    file:
+      path: /opt/sdbm/jdbc
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0755'
+
+  - name: Copy the JDBC drivers
+    copy:
+      src: /staging/{{ item }}
+      dest: /opt/sdbm/jdbc/
+      owner: oracle
+      group: oinstall
+      mode: '0644'
+      remote_src: yes
+    with_items:
+      - "{{ jdbc_ora_file }}"
+      - "{{ jdbc_mss_file }}"
+      - "{{ jdbc_mys_file }}"
+
+
+  - name: Create work directory /staging/_sdbm-install-sql
+    file:
+      path: /staging/_sdbm-install-sql
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Create work directory /opt/sdbm/_sdbm-install-log
+    file:
+      path: /opt/sdbm/_sdbm-install-log
+      state: directory
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+
+  - name: Copy SDBM SQL scripts
+    copy:
+      src: "{{ item }}"
+      dest: /staging/_sdbm-install-sql/
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+    with_items:
+      - ../../database/a-sdbm_base.sql
+      - ../../database/b-sdbm_schema.sql
+      - ../../database/c-sdbm_code_plsql.sql
+      - ../../database/d-sdbm_final.sql
+      - ../../database/e-sdbm_audit.sql
+      - ../../database/f-sdbm_code_service.sql
+      - ../../database/g-sdbm_post_install.sql
+      - ../../database/z-sdbm_lock.sql
+      - ../../database/z-sdbm_unlock.sql
+      - ../../database/_delta/ps-conv_mdp_usager_temp.sql
+      - ../../database/_delta/pb-conv_mdp_usager_temp.sql
+
+  - name: Create SDBM SQL scripts - subfolders
+    copy:
+      src: "{{ item }}"
+      dest: /staging/_sdbm-install-sql/
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+    with_items:
+      - ../../database/_apex
+      - ../../database/_dbms_job
+      - ../../database/_function
+      - ../../database/_package
+      - ../../database/_trigger
+      - ../../database/_view
+
+  - name: Execute a-sdbm_base.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - a-sdbm_base
+
+  - name: Execute b-sdbm_schema.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - b-sdbm_schema
+
+  - name: Execute c-sdbm_code_plsql.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - c-sdbm_code_plsql
+
+  - name: Execute d-sdbm_final.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - d-sdbm_final
+
+  - name: Execute e-sdbm_audit.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - e-sdbm_audit
+
+  - name: Execute f-sdbm_code_service.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - f-sdbm_code_service
+
+  - name: Execute g-sdbm_post_install.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - g-sdbm_post_install
+
+
+  - name: Execute z-sdbm_unlock.sql - log directory is /opt/sdbm/_sdbm-install-log
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - z-sdbm_unlock
+
+  - name: Execute Oracle expdp to get SDBM schema to build on Windows - sdbm_exp_schema must be set to yes
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        export TWO_TASK="(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=`hostname`)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=XEPDB1)))"
+        expdp SDBM/admin directory=ORACLE_HOME dumpfile=exp-sdbm.dpdmp reuse_dumpfiles=TRUE exclude=STATISTICS 2>&1 | tee /opt/sdbm/_sdbm-install-log/exp-sdbm.log
+    become: yes
+    become_user: oracle
+    when: sdbm_exp_schema is defined and sdbm_exp_schema == 'yes'
+
+  - name: Get exp-sdbm.dpdmp to ../windows/ - sdbm_exp_schema must be set to yes
+    fetch:
+      src: /opt/oracle/product/{{ oraclexe_version }}/dbhomeXE/exp-sdbm.dpdmp 
+      dest: ../windows/exp-sdbm.dpdmp
+      flat: yes
+    when: sdbm_exp_schema is defined and sdbm_exp_schema == 'yes'
+
+  - name: Get exp-sdbm.log to .../windows/ - sdbm_exp_schema must be set to yes
+    fetch:
+      src: /opt/sdbm/_sdbm-install-log/exp-sdbm.log 
+      dest: ../windows/exp-sdbm.log
+      flat: yes
+    when: sdbm_exp_schema is defined and sdbm_exp_schema == 'yes'
+
+  - name: Execute z-sdbm_lock.sql - log directory is /opt/sdbm/_sdbm-install-log
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - z-sdbm_lock
+
+
+  - name: Upload SDBM APEX installation script - apex_insta_type = full - version {{ sdbm_apex_version }}
+    copy:
+      content: |
+        WHENEVER OSERROR  EXIT 8
+        WHENEVER SQLERROR EXIT SQL.SQLCODE
+      
+        connect / as sysdba
+        alter session set container = XEPDB1;
+
+        execute APEX_INSTANCE_ADMIN.ADD_WORKSPACE(P_WORKSPACE_ID => 1934305315547664, P_WORKSPACE => 'SDBM', P_SOURCE_IDENTIFIER => 'SDBM', P_PRIMARY_SCHEMA => 'SDBM', P_ADDITIONAL_SCHEMAS => NULL);
+        alter user {{ oracleapex_schema }} account unlock;
+        alter user {{ oracleapex_schema }} identified by admin;
+
+        alter session set current_schema = {{ oracleapex_schema }};
+        @_apex/sdbm_apex_f101.static_file.sql
+        @_apex/sdbm_apex_f101.debug.{{ sdbm_apex_version }}.sql
+        @_apex/sdbm_apex_f111.debug.{{ sdbm_apex_version }}.sql
+
+        alter user {{ oracleapex_schema }} account lock;
+        exit
+      dest: /staging/_sdbm-install-sql/i-sdbm_apex_install.sql
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+    when: apex_insta_type is defined and apex_insta_type == "full"
+
+  - name: Upload SDBM APEX installation script - apex_insta_type = runtime - version {{ sdbm_apex_version }}
+    copy:
+      content: |
+        WHENEVER OSERROR  EXIT 8
+        WHENEVER SQLERROR EXIT SQL.SQLCODE
+      
+        connect / as sysdba
+        alter session set container = XEPDB1;
+
+        execute APEX_INSTANCE_ADMIN.ADD_WORKSPACE(P_WORKSPACE_ID => 1934305315547664, P_WORKSPACE => 'SDBM', P_SOURCE_IDENTIFIER => 'SDBM', P_PRIMARY_SCHEMA => 'SDBM', P_ADDITIONAL_SCHEMAS => NULL);
+        alter user {{ oracleapex_schema }} account unlock;
+        alter user {{ oracleapex_schema }} identified by admin;
+
+        alter session set current_schema = {{ oracleapex_schema }};
+        @_apex/sdbm_apex_f101.static_file.sql
+        @_apex/sdbm_apex_f101.release.{{ sdbm_apex_version }}.sql
+        @_apex/sdbm_apex_f111.release.{{ sdbm_apex_version }}.sql
+
+        alter user {{ oracleapex_schema }} account lock;
+        exit
+      dest: /staging/_sdbm-install-sql/i-sdbm_apex_install.sql
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+    when: ((apex_insta_type is not defined) or (apex_insta_type == "runtime"))
+
+  - name: Execute i-sdbm_apex_install.sql - log directory is /opt/sdbm/_sdbm-install-log - this task will be skipped if the log already exists
+    shell:
+      cmd: |
+        export PATH=$PATH:/usr/local/bin;
+        source /home/oracle/.bash_profile;
+        set -o pipefail
+        export NLS_LANG=AMERICAN_AMERICA.AL32UTF8;
+        cd /staging/_sdbm-install-sql
+        sqlplus /nolog @{{ item }}.sql 2>&1 | tee /opt/sdbm/_sdbm-install-log/{{ item }}.log
+      creates: /opt/sdbm/_sdbm-install-log/{{ item }}.log
+    become: yes
+    become_user: oracle
+    register: sdbm_sql
+    with_items:
+      - i-sdbm_apex_install
+
+
+
+  - name: Install SDBMSrv, SDBMDac and SDBMAgt
+    copy:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/{{ item }}
+      dest: /opt/sdbm
+      owner: oracle
+      group: oinstall
+      directory_mode: '0750'
+      mode: '0640'
+    with_items:
+      - sdbmsrv
+      - sdbmdac
+      - sdbmagt
+
+  - name: Update jdbc drivers version within service control scripts for SDBMSrv, SDBMDac and SDBMAgt
+    template:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/{{ item.service }}/{{ item.script }}
+      dest: /opt/sdbm/{{ item.service }}/{{ item.script }}
+    with_items:
+      - { service: 'sdbmagt', script: 'sdbmagtctl' }
+      - { service: 'sdbmdac', script: 'SDBMDaC.sh' }
+      - { service: 'sdbmsrv', script: 'SDBMSrv.sh' }
+
+  - name: Create /opt/sdbm/sdbmsrv|dac|agt/log directories
+    file:
+      path: /opt/sdbm/{{ item }}/log
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+      state: directory
+    with_items:
+      - sdbmsrv
+      - sdbmdac
+      - sdbmagt
+
+  - name: Update files permission
+    file:
+      path: /opt/sdbm/{{ item }}
+      mode: '0750'
+    with_items:
+      - sdbmsrv/sdbmsrv
+      - sdbmsrv/sdbmsrvctl
+      - sdbmsrv/SDBMSrv.sh
+      - sdbmdac/sdbmdac
+      - sdbmdac/sdbmdacctl
+      - sdbmdac/SDBMDaC.sh
+      - sdbmagt/sdbmagt
+      - sdbmagt/sdbmagtctl
+
+  - name: Add SDBM service related scripts
+    copy:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/{{ item }}/{{ item }}.service
+      dest: /etc/systemd/system
+      mode: '0644'
+    with_items:
+      - sdbmsrv
+      - sdbmdac
+      - sdbmagt
+
+  - name: Install SDBM database backup scripts
+    copy:
+      src: ../../server/_runtime/sdbm.server.linux.x86_64/{{ item }}
+      dest: /opt/sdbm
+      owner: oracle
+      group: oinstall
+      mode: '0750'
+    with_items:
+      - LibUtilsBASH.sh
+      - RMAN.ExpEnv.sh
+      - rman-bkarc-sdbm.sh
+      - rman-bkdbs-sdbm.sh 
+
+  - name: Create /backup directory
+    file:
+      path: /backup
+      owner: oracle
+      group: dba
+      mode: '0750'
+      state: directory
+
+
+  - name: Check if firstboot must be created
+    shell: 
+      /home/oracle/getSQLResult.sh "SELECT COUNT(1) FROM SDBM.CIBLE WHERE NOM_CIBLE = 'SDBM';"
+    changed_when: false
+    failed_when: '"ORA-" in shell_sdbm_cible.stdout'
+    become: yes
+    become_user: oracle
+    register: shell_sdbm_cible
+
+  - name: Create file /etc/init.d/sdbmsrv.firstboot (if required)
+    file:
+      path: /opt/sdbm/sdbmsrv/sdbmsrv.firstboot 
+      state: touch
+      owner: oracle
+      group: oinstall
+      mode: '0640'
+    when: shell_sdbm_cible.stdout.replace(' ','') != "1"
+
+
+  - name: Get hostname from SDBM XE database
+    shell: 
+      /home/oracle/getSQLResult.sh "SELECT SYS_CONTEXT('USERENV','SERVER_HOST') FROM DUAL;"
+    changed_when: false
+    failed_when: '"ORA-" in shell_sdbm_hostname.stdout'
+    become: yes
+    become_user: oracle
+    register: shell_sdbm_hostname
+
+  - name: Change SDBMHostName within /opt/sdbm/sdbmagt/SDBMAgt.properties to {{ shell_sdbm_hostname.stdout }}  
+    replace: 
+      path: /opt/sdbm/sdbmagt/SDBMAgt.properties
+      regexp: '^[#]?SDBMHostName      = .*$'
+      replace: 'SDBMHostName      = {{ shell_sdbm_hostname.stdout }}'
+
+
+  - name: Enable and start Linux service for SDBMSrv, SDBMDac and SDBMAgt
+    systemd:
+      name: "{{ item }}"
+      enabled: yes
+      state: restarted
+      daemon_reload: yes
+    with_items:
+      - sdbmsrv
+      - sdbmdac
+      - sdbmagt
+
+

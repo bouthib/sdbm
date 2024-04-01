@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# 
+# Script :
+#    sdbmsrvctl
+#
+# Description :
+#    Control of Java server SDBMSrv.
+#
+
+
+# Schema - multi schema install
+export SDBM_SCH=SDBM;
+
+# Root directory Java - SDBM
+export JAVA_DIR=/opt/java/jre-sdbm;
+export SDBM_DIR=/opt/sdbm;
+
+
+statusSDBMSrv()
+{
+   if [ `ps -ef | grep "SDBMSrv $SDBM_SCH" | grep -v "grep SDBMSrv $SDBM_SCH" | wc -l` -gt 0 ] ; then
+      echo "SDBMSrv is running."
+   else
+      echo "SDBMSrv is stopped."
+   fi
+}
+
+
+startSDBMSrv()
+{
+   if [ `ps -ef | grep "SDBMSrv $SDBM_SCH" | grep -v "grep SDBMSrv $SDBM_SCH" | wc -l` -gt 0 ] ; then
+      echo "SDBMSrv is already running."
+   else
+      cd $SDBM_DIR/sdbmsrv;
+      if [ -f $SDBM_DIR/sdbmsrv/nohup.out ] ; then
+         rm -f $SDBM_DIR/sdbmsrv/nohup.out
+      fi
+
+      # Starting HangCheck monitor...
+      nohup ./SDBMSrv.sh $SDBM_SCH & > /dev/null 2>&1
+      sleep 1
+      statusSDBMSrv      
+   fi
+}
+
+
+stopSDBMSrv()
+{
+   if [ `ps -ef | grep "./SDBMSrv.sh $SDBM_SCH" | grep -v "grep ./SDBMSrv.sh $SDBM_SCH" | wc -l` -lt 1 ] ; then
+      echo "SDBMSrv is not running."
+   else
+      pidSDBMSrv=$(ps -ef | grep "./SDBMSrv.sh $SDBM_SCH" | grep -v "grep ./SDBMSrv.sh $SDBM_SCH" | awk '{print $2}')
+      kill $pidSDBMSrv
+      echo PID $pidSDBMSrv has been signal to stop.
+      sleep 3
+      statusSDBMSrv      
+   fi
+}
+
+
+
+# See how we were called.
+case "$1" in
+
+   status)
+      statusSDBMSrv
+      ;;
+ 
+   start)
+      startSDBMSrv
+      ;;
+
+   stop)
+      stopSDBMSrv
+      ;;
+
+   *)
+      echo "Usage: $0 {start|stop|status}"
+      exit 1
+ 
+esac

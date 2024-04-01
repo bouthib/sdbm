@@ -1,0 +1,84 @@
+#
+# Examples :
+#
+# VM      : sdbm ansible_host=000.000.000.000 or DNS
+# OCI     : sdbm ansible_host=000.000.000.000 ansible_user=opc
+# vagrant : sdbm ansible_host=VirtualBox-Host ansible_port=VirtualBox-NAT-Port ansible_user=vagrant ansible_ssh_pass="Vagrant user password"
+#
+sdbm ansible_host=000.000.000.000 or DNS
+
+
+[all:vars]
+ansible_python_interpreter=auto_silent
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+# Build date
+build_date=2024.03
+
+# User (UID) and groups (GID)
+#oracle_uid=
+#oinstall_gid=
+#dba_gid=
+
+# Oracle XE install password
+oracle_password=My0raclePwd00#
+
+# Apex installation type : runtime | full
+apex_password=MyApexPwd00#
+apex_insta_type=runtime
+
+# Apex ORDS service accounts password
+apex_service_password=MyInternalPwd00#
+
+# Oracle XE preinstall RPM location (only use on none Oracle Linux system)
+oraclexe_preinstall_urls=["https://yum.oracle.com/repo/OracleLinux/OL8/appstream/x86_64/getPackage/compat-openssl10-1.0.2o-4.el8_6.x86_64.rpm", "https://yum.oracle.com/repo/OracleLinux/OL8/appstream/x86_64/getPackage/oracle-database-preinstall-21c-1.0-1.el8.x86_64.rpm"]
+
+# Oracle XE
+oraclexe_url=https://download.oracle.com/otn-pub/otn_software/db-express/oracle-database-xe-21c-1.0-1.ol8.x86_64.rpm
+oraclexe_file=oracle-database-xe-21c-1.0-1.ol8.x86_64.rpm
+oraclexe_version=21c
+oraclexe_config=oracle-xe-{{ oraclexe_version }}
+
+# Oracle APEX
+oracleapex_version=23.2.0
+oracleapex_url=https://download.oracle.com/otn_software/apex/apex_23.2.zip
+oracleapex_file=apex_23.2.zip
+oracleapex_schema=APEX_230200
+
+# Oracle ORDS
+oracleords_url=https://download.oracle.com/otn_software/java/ords/ords-23.4.0.346.1619.zip
+oracleords_file=ords-23.4.0.346.1619.zip
+
+# Java - ORDS - required
+java_url=https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.10%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.10_7.tar.gz
+java_file=OpenJDK17U-jdk_x64_linux_hotspot_17.0.10_7.tar.gz
+java_dir=jdk-17.0.10+7
+
+# Java - SDBM - optional
+java_sdbm_url=https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u402-b06/OpenJDK8U-jdk_x64_linux_hotspot_8u402b06.tar.gz
+java_sdbm_file=OpenJDK8U-jdk_x64_linux_hotspot_8u402b06.tar.gz
+java_sdbm_dir=jdk8u402-b06
+
+#
+# JDBC
+#
+
+# Oracle ojdbc5 (allow monitoring of Oracle 9 database)
+jdbc_ora_file5=ojdbc5.jar
+
+# Oracle ojdbc8
+jdbc_ora_file=ojdbc8.jar
+
+# Microsoft SQL
+jdbc_mss_file=mssql-jdbc-12.6.0.jre8.jar
+
+# MySQL
+jdbc_mys_file=mysql-connector-j-8.3.0.jar
+
+
+# SDBM APEX
+sdbm_apex_version=0.32.1
+
+# SDBM - schema - optional (get export for Windows installation)
+sdbm_exp_schema=no
+

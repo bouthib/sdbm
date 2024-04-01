@@ -1,0 +1,27 @@
+---------------------------------------------------------------------
+SDBM includes some third-party open source components in its
+distribution. The list below identifies the community or 
+organization and links to their appropriate license terms.
+
+The SDBM team would like to thank all the communities of the
+projects listed below for their contributions. 
+---------------------------------------------------------------------
+
+The following components are included without modification:
+
+- hyperic-sigar -
+Information: https://github.com/hyperic/sigar/
+License: https://github.com/hyperic/sigar/blob/master/LICENSE
+
+
+Windows only (install tools) :
+
+fart-it
+https://github.com/lionello/fart-it
+
+NSSM (The Non-Sucking Service Manager https://nssm.cc/)
+https://git.nssm.cc/nssm/nssm.git
+
+unzip
+https://gnuwin32.sourceforge.net/packages/unzip.htm
+

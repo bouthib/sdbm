@@ -1,0 +1,3 @@
+*.jar
+!ojdbc5.jar
+*.zip

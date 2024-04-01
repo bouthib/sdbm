@@ -1,0 +1,12 @@
+[Unit]
+Description=Script to handle ords standalone as a service (SDBM)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/opt/oracle/product/ords.script/ords-service-start.sh
+ExecStop=/opt/oracle/product/ords.script/ords-service-stop.sh
+
+[Install]
+WantedBy=default.target

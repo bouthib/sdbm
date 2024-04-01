@@ -1,0 +1,12 @@
+[Unit]
+Description=Script to handle sdbmsrv as a service (SDBM)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/opt/sdbm/sdbmsrv/sdbmsrv start
+ExecStop=/opt/sdbm/sdbmsrv/sdbmsrv stop
+
+[Install]
+WantedBy=default.target

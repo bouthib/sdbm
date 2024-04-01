@@ -1,0 +1,101 @@
+<source>Annuler les notifications (immédiate)</source>
+<target>Annuler les notifications (immédiate)</target>
+
+<source>Traitement des statistiques</source>
+<target>Traitement des statistiques</target>
+
+<source>Mettre à jour</source>
+<target>Mettre à jour</target>
+
+<source>Définition des volumes physique</source>
+<target>Définition des volumes physique</target>
+
+<source>Annuler les notifications (différée)</source>
+<target>Annuler les notifications (différée)</target>
+
+<source>Rechercher</source>
+<target>Rechercher</target>
+
+<source>Afficher tout</source>
+<target>Afficher tout</target>
+
+<source>Le mot de passe ne doit être vide.</source>
+<target>Le mot de passe ne doit être vide.</target>
+
+<source>La formule de calcul de notification différée est invalide.</source>
+<target>La formule de calcul de notification différée est invalide.</target>
+
+<source>La commande ne peut dépassée une grosseur de 4000 octets (UTF8).</source>
+<target>La commande ne peut dépassée une grosseur de 4000 octets (UTF8).</target>
+
+<source>Espace 1</source>
+<target>Espace 1</target>
+
+<source>Espace 2</source>
+<target>Espace 2</target>
+
+<source>Utilisation %CPU - 48 dernières heures</source>
+<target>Utilisation %CPU - 48 dernières heures</target>
+
+<source>Maintenance</source>
+<target>Maintenance</target>
+
+<source>Événements</source>
+<target>Événements</target>
+
+<source>Charge système (Load Average)</source>
+<target>Charge système (Load Average)</target>
+
+<source>Navigation</source>
+<target>Navigation</target>
+
+<source>Maintenance</source>
+<target>Maintenance</target>
+
+<source>Etes-vous sûr de vouloir quitter cette page sans l'enregistrer ?</source>
+<target>Etes-vous sûr de vouloir quitter cette page sans l'enregistrer ?</target>
+
+<source>Would you like to perform this delete action?</source>
+<target>Would you like to perform this delete action?</target>
+
+<source>Ajout d'une règle de notification spécifiques</source>
+<target>Ajout d'une règle de notification spécifiques</target>
+
+<source>ADRESSE</source>
+<target>ADRESSE</target>
+
+<source>TYPE_CIBLE</source>
+<target>TYPE_CIBLE</target>
+
+<source>SOUS_TYPE_CIBLE</source>
+<target>SOUS_TYPE_CIBLE</target>
+
+<source>Type Cible</source>
+<target>Type Cible</target>
+
+<source>Sous Type Cible</source>
+<target>Sous Type Cible</target>
+
+<source>NOM_ÉVENEMENT</source>
+<target>NOM_ÉVENEMENT</target>
+
+<source>Vous ne possèder pas les accès requis.</source>
+<target>Vous ne possèder pas les accès requis.</target>
+
+<source>Répartition %CPU - Dernière collecte</source>
+<target>Répartition %CPU - Dernière collecte</target>
+
+<source>Utilisation %CPU - 48 dernières heures</source>
+<target>Utilisation %CPU - 48 dernières heures</target>
+
+<source>Utilisation %CPU (historique)</source>
+<target>Utilisation %CPU (historique)</target>
+
+<source>Aucune donnée n'a été trouvée.</source>
+<target>Aucune donnée n'a été trouvée.</target>
+
+<source>Vérification</source>
+<target>Vérification</target>
+
+<source>Intervale</source>
+<target>Intervale</target>

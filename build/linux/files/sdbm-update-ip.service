@@ -1,0 +1,11 @@
+[Unit]
+Description=Script to update configuration on IP change (SDBM)
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/opt/sdbm-update-ip/sdbm-update-ip.sh
+
+[Install]
+WantedBy=default.target

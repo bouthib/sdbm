@@ -1,0 +1,1 @@
+SDBMSrv -INSTALL ".\..\java\{SDBM_JAVA_DIR}\bin\client" "-Djava.class.path=.;.\SDBMSrv.jar;.\..\jdbc\ojdbc8.jar;.\..\jdbc\mssql-jdbc-12.6.0.jre8.jar;.\..\jdbc\mysql-connector-j-8.3.0.jar" "SDBMSrv" "SDBM" 10 60 30 0
