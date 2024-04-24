@@ -15,7 +15,7 @@ IS
 **********************************************************************/
 /*********************************************************************
   PACKAGE : SDBM_SMTP
-  AUTEUR  : Benoit Bouthillier 2009-10-02 (2023-04-04)
+  AUTEUR  : Benoit Bouthillier 2009-10-02 (2024-04-23)
  ---------------------------------------------------------------------
   BUT : Ce package permet l'implantation des procédures utilitaire
         SMTP pour le moniteur Oracle.
@@ -28,7 +28,7 @@ IS
     *****************************************************************/
 
     -- Version du corps PL/SQL
-    VERSION_PB CONSTANT VARCHAR2(4 CHAR) := '0.06';
+    VERSION_PB CONSTANT VARCHAR2(4 CHAR) := '0.07';
 
 
    /******************************************************************
@@ -76,7 +76,7 @@ IS
 
    /******************************************************************
      PROCEDURE : ENVOYER_SMTP
-     AUTEUR    : Benoit Bouthillier 2010-06-03 (2023-04-04)
+     AUTEUR    : Benoit Bouthillier 2010-06-03 (2024-04-23)
     ------------------------------------------------------------------
      BUT : Cette procédure à pour but de procéder à l'envoi d'un
            courriel.
@@ -111,6 +111,8 @@ IS
       MP_MI_SIZE CONSTANT BINARY_INTEGER := 2016;
       MP_MI_TYPE CONSTANT VARCHAR2(256 CHAR)  := 'multipart/mixed; boundary="' || BOUNDARY || '"';
 
+      -- Definition limite SUJET
+      C_MAX_LONG_SUJET    NUMBER(2) := 70;
 
       -- Variables locales
       V_TS_CURRENT         TIMESTAMP;
@@ -122,6 +124,7 @@ IS
       V_STARTTLS_SMTP      PARAMETRE.STARTTLS_SMTP%TYPE;
       V_CHEMIN_WALLET_SMTP PARAMETRE.CHEMIN_WALLET_SMTP%TYPE;
       V_MDP_WALLET_SMTP    PARAMETRE.MDP_WALLET_SMTP%TYPE;
+      V_SUJET              VARCHAR2(70 CHAR);
 
       V_CONNEXION          UTL_SMTP.CONNECTION;
       V_DESTINATAIRE       VARCHAR2(4000 CHAR) := TRIM(BOTH ';' FROM REPLACE(A_DESTINATAIRE,' ',''));
@@ -245,7 +248,15 @@ IS
       UTL_SMTP.WRITE_DATA(V_CONNEXION,'From: "'   || V_EXPEDITEUR_SMTP || '" <' || V_EXPEDITEUR_SMTP || '>' || UTL_TCP.CRLF);
       UTL_SMTP.WRITE_DATA(V_CONNEXION,'To: "'     || V_DESTINATAIRE    || '" <' || V_DESTINATAIRE    || '>' || UTL_TCP.CRLF);
 
-      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Subject: =?UTF-8?Q?' || UTL_RAW.CAST_TO_VARCHAR2(UTL_ENCODE.QUOTED_PRINTABLE_ENCODE(UTL_RAW.CAST_TO_RAW(A_SUJET))) || '?=' || UTL_TCP.CRLF);
+      -- Validation pour longeur du sujet du courriel 
+      IF (LENGTH(A_SUJET) > C_MAX_LONG_SUJET) THEN
+         V_SUJET := SUBSTR(A_SUJET,1,C_MAX_LONG_SUJET-3) || '...';
+      ELSE
+	 V_SUJET := A_SUJET;
+      END IF;
+      
+      -- Utilisation de ISO8859-1 pour permettre à la longueur de ne pas être variable dû aux accents
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Subject: =?ISO8859-1?Q?' || UTL_RAW.CAST_TO_VARCHAR2(UTL_ENCODE.QUOTED_PRINTABLE_ENCODE(UTL_RAW.CAST_TO_RAW(CONVERT(V_SUJET,'WE8ISO8859P1','UTF8')))) || '?=' || UTL_TCP.CRLF);
 
       -- Ajout MIME MULTIPART (si requis)
       IF (A_BLB_FICHIER IS NOT NULL) THEN
