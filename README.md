@@ -33,11 +33,11 @@ Le serveur de gestion fonctionne sans aucune installation sur vos serveurs de ba
 
 ### Installation simple via "Releases"
 
-Le fichier "release" est diponible pour permettre l'installation la plus simple possible.  Avec cette façon, certain composant comme les services Java sont pré-compilés.  Il est aussi à noter que c'est la seule façon possible pour obtenir tout les utilitaires requis pour procéder à une installation sur Windows.  Si vous n'avez pas l'intention de modifier le code Java, cette méthode est recommandée.
+Le fichier "release" est diponible pour permettre l'installation la plus simple possible.  Avec cette façon, certains composants comme les services Java sont pré-compilés.  **Il est aussi à noter que c'est la seule façon possible pour obtenir tout les utilitaires requis pour procéder à une installation sur Windows**.  Si vous n'avez pas l'intention de modifier le code Java, cette méthode est recommandée.
 
 #### Linux
 
-Ansible est utilisé pour déployer SDBM sous Linux (donc ansible doit être disponible au même endroit ou le fichier sdbm-release-{verison}.zip extrait). Aucun prérequis n'est requis sur la machine cible (celle qui exécutera SDBM). Votre fichier d'inventaire ansible peut être créer à partir de build/linux/sdbm.example.
+Ansible est utilisé pour déployer SDBM sous Linux (donc ansible doit être disponible au même endroit ou le fichier sdbm-release-{verison}.zip extrait). Aucun prérequis n'est nécessaire sur la machine cible (celle qui exécutera SDBM). Votre fichier d'inventaire ansible peut être créer à partir de build/linux/sdbm.example.
 
 ```
 # Sur Linux : Exécution
@@ -68,7 +68,7 @@ ansible-playbook -i sdbm.example ojdbc5.yml -kK
 
 #### Windows
 
-Un ensemble de fichiers de commandes est disponible pour installer tout les composants requis pour l'exécution de SDBM sous Windows.  Certain prérequis sont requis sur la machine cible (voir build\windows\Install.cmd).
+Un ensemble de fichiers de commandes est disponible pour installer tout les composants requis pour l'exécution de SDBM sous Windows.  Certains prérequis sont nécessaires sur la machine cible (voir build\windows\Install.cmd).
 
 ```
 # Sur Windows : Exécution
@@ -117,7 +117,7 @@ cd ../sdbm/server
 
 ### Installation sans utiliser "Releases"
 
-Ansible est utilisé pour déployer SDBM sous Linux (donc ansible doit être disponible au même endroit ou réside le clône du dépôt git). Aucun prérequis n'est requis sur la machine cible (celle qui exécutera SDBM). Votre fichier d'inventaire ansible peut être créer à partir de ../sdbm/build/linux/sdbm.example.
+Ansible est utilisé pour déployer SDBM sous Linux (donc ansible doit être disponible au même endroit ou réside le clône du dépôt git). Aucun prérequis n'est nécessaire sur la machine cible (celle qui exécutera SDBM). Votre fichier d'inventaire ansible peut être créer à partir de ../sdbm/build/linux/sdbm.example.
 
 Ce point atteint, l'installation devrait être simple :
 
@@ -192,11 +192,11 @@ The management server runs without any installation on your server database. Onl
 
 ### Simple installation using Releases
 
-The release file is available to allow the simplest possible installation. Using this method, certain components such as Java services are pre-compiled. This is the only way to get all the utilities required to carry out installations on Windows. If you do not intend to modify Java code, this method is recommended.
+The release file is available to allow the simplest possible installation. Using this method, certain components such as Java services are pre-compiled. **This is the only way to get all the utilities required to carry out installations on Windows.** If you do not intend to modify Java code, this method is recommended.
 
 #### Linux
 
-SDBM on Linux is deploy using ansible (so ansible must be available on the same machine where the sdbm-release-{version}.zip is extracted). No special prerequisite are required on the "target" machine (the one that will execute SDBM). The ansible inventory file build/linux/sdbm.example can be use to create your own inventory file.
+SDBM on Linux is deploy using ansible (so ansible must be available on the same machine where the sdbm-release-{version}.zip is extracted). No special prerequisite is required on the "target" machine (the one that will execute SDBM). The ansible inventory file build/linux/sdbm.example can be use to create your own inventory file.
 
 ```
 # On Linux : Execute
@@ -228,7 +228,7 @@ ansible-playbook -i sdbm.example ojdbc5.yml -kK
 
 #### Windows
 
-A set of batch files is available to install all the components required to run SDBM under Windows. Certain prerequisites are required on the target machine (see build\windows\Install.cmd).
+A set of batch files is available to install all the components required to run SDBM under Windows. Certains prerequisites are required on the target machine (see build\windows\Install.cmd).
 
 ```
 # On Windows : Execute
@@ -277,7 +277,7 @@ cd ../sdbm/server
 
 ### Installation without using Release
 
-SDBM on Linux is deploy using ansible (so ansible must be available on the same machine where to git repository is clone). No special prerequisite are required on the "target" machine (the one that will execute SDBM). The ansible inventory file ../sdbm/build/linux/sdbm.example can be use to create your own inventory file.
+SDBM on Linux is deploy using ansible (so ansible must be available on the same machine where to git repository is clone). No special prerequisite is required on the "target" machine (the one that will execute SDBM). The ansible inventory file ../sdbm/build/linux/sdbm.example can be use to create your own inventory file.
 
 At this point, the installation shoud be simple :
 

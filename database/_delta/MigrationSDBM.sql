@@ -5,6 +5,7 @@
 -- *
 
 
+
 #
 # A partir du nouveau serveur
 #
@@ -23,9 +24,7 @@ alter user sdbm account unlock;
 exit
 
 
-#
 # Avec SDBM (nouvelle BD)
-#
 export TWO_TASK=localhost:1521/xepdb1
 sqlplus sdbm/admin
 
@@ -82,15 +81,25 @@ END;
 /
 
 
+
 #
 # A partir de l'ancien serveur
 #
 su - oracle
 
+sqlplus / as sysdba
+alter user sdbm account unlock;
+exit
+
 # *** Avant export, détruire les tables de "backups" s'il y a lieu pour éviter les erreurs à l'import ***
 cd /tmp
 export NLS_LANG=AMERICAN_AMERICA.WE8MSWIN1252
-exp SDBM/admin file=sdbm.transfert.dmp log=exp-sdbm.transfert.log consistent=Y direct=Y statistics=NONE
+exp SDBM/admin file=sdbm.transfert.dmp log=sdbm.transfert-exp.log consistent=Y direct=Y statistics=NONE
+
+sqlplus / as sysdba
+alter user sdbm account lock;
+exit
+
 
 
 #
@@ -149,12 +158,51 @@ END HECA_SUBSTR_TEXTE;
 /
 exit
 
-imp SDBM/admin file=sdbm.transfert.dmp log=imp-sdbm.transfert.log constraints=N grants=N ignore=Y
+
+imp SDBM/admin file=sdbm.transfert.dmp log=sdbm.transfert-imp.log constraints=N grants=N ignore=Y
+
+##################################################
+###### Erreurs acceptables (source XE 10.2) ######
+##################################################
+# ...
+# . importing SDBM's objects into SDBM
+# IMP-00017: following statement failed with ORACLE error 1031:
+#  "CREATE LIBRARY "ORAUNI" UNTRUSTED AS '/usr/lib/oracle/xe/app/oracle/product"
+#  "/10.2.0/server/lib/orauni.so'"
+# IMP-00003: ORACLE error 1031 encountered
+# ORA-01031: insufficient privileges
+# ...
+# . . importing table     "HIST_EVENEMENT_CIBLE_AGT"     ?????? rows imported
+# IMP-00017: following statement failed with ORACLE error 1702:
+#  "CREATE INDEX "HECA_DH_HIST_TYP_CIB_NOM_CIB" ON "HIST_EVENEMENT_CIBLE_AGT" ("
+#  ""DH_HIST_EVENEMENT" , "TYPE_CIBLE" , "NOM_CIBLE" )  PCTFREE 10 INITRANS 2 M"
+#  "AXTRANS 255 STORAGE(INITIAL 38928384 FREELISTS 1 FREELIST GROUPS 1 BUFFER_P"
+#  "OOL DEFAULT) TABLESPACE "SDBM_DATA" LOGGING"
+# IMP-00003: ORACLE error 1702 encountered
+# ORA-01702: a view is not appropriate here
+# IMP-00017: following statement failed with ORACLE error 1702:
+#  "CREATE INDEX "HECA_STATUT" ON "HIST_EVENEMENT_CIBLE_AGT" ("STATUT" )  PCTFR"
+#  "EE 10 INITRANS 2 MAXTRANS 255 STORAGE(INITIAL 23330816 FREELISTS 1 FREELIST"
+#  " GROUPS 1 BUFFER_POOL DEFAULT) TABLESPACE "SDBM_DATA" LOGGING"
+# IMP-00003: ORACLE error 1702 encountered
+# ORA-01702: a view is not appropriate here
+# ...
+# . . importing table       "MV_INFO_VOLUME_FICHIER"
+# IMP-00058: ORACLE error 1732 encountered
+# ORA-01732: data manipulation operation not legal on this view
+# . . importing table   "MV_INFO_VOLUME_UTILISATION"
+# IMP-00058: ORACLE error 1732 encountered
+# ORA-01732: data manipulation operation not legal on this view
+# ...
+# IMP-00098: INTERNAL ERROR: impccr2
+# IMP-00098: INTERNAL ERROR: impccr2
+# IMP-00098: INTERNAL ERROR: impccr2
+# About to enable constraints...
+# Import terminated successfully with warnings.
+##################################################
 
 
-#
 # Avec SDBM (nouvelle BD)
-#
 sqlplus sdbm/admin
 
 DROP VIEW HIST_EVENEMENT_CIBLE_AGT;
@@ -169,7 +217,8 @@ UPDATE SDBM.VOLUME_PHY
 
 UPDATE SDBM.VOLUME_PHY_CIBLE
    SET CHEMIN_ACCES = '/opt/oracle'
- WHERE NOM_CIBLE = 'SDBM';
+ WHERE NOM_CIBLE       = 'SDBM'
+   AND CHEMIN_ACCES LIKE '/usr/%';
 
 -- Correction du nom de l'agent d'exécution
 UPDATE SDBM.TACHE_DET_MSG_AGT
@@ -187,6 +236,7 @@ UPDATE SDBM.TACHE_AGT
 
 COMMIT;
 exit
+
 
 
 --
@@ -207,7 +257,6 @@ END;
 exit
 
 
--- Via SDBM
 cd /staging/sdbm-sql
 export TWO_TASK=localhost:1521/xepdb1
 export NLS_LANG=AMERICAN_AMERICA.AL32UTF8
@@ -282,7 +331,6 @@ END;
 
 DROP PROCEDURE UNICENTER_INTERFACE;
 DROP FUNCTION EXT_UNICENTER_INTERFACE;
-
 exit
 
 
@@ -301,8 +349,9 @@ exit
 exit
 
 
+
 #
-# Correction de la cible SDBM - via l'interface graphique
+# Correction de la cible SDBM - via l'interface graphique (incluant le mot de passe de SDBMON)
 #
 (DESCRIPTION =
    (ADDRESS_LIST =
