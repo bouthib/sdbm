@@ -116,7 +116,7 @@ echo.
 echo.
 
 echo Checking if Oracle XE is already installed...
-REG QUERY HKLM\SOFTWARE\Oracle\KEY_XE > NUL 2>&1
+REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Oracle\KEY_OraDB21Home1 > NUL 2>&1
 if %ERRORLEVEL% EQU 0 goto ERR_XE_EXISTE
 echo OK.
 echo.
