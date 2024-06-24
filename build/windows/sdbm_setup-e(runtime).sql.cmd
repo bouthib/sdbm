@@ -18,6 +18,9 @@ echo @download\sdbm_apex_f101.release.0.32.1.sql
 echo @download\sdbm_apex_f111.release.0.32.1.sql
 echo @download\sdbm_apex_f101.static_file.sql
 echo.
+echo.
+echo CONNECT / AS SYSDBA
+echo alter session set container = XEPDB1;
 echo alter user %ORACLE_APEX_SCHEMA% account lock;
 echo alter user SDBM        account lock;
 echo REVOKE READ, WRITE ON DIRECTORY ORACLE_HOME FROM SDBM;
