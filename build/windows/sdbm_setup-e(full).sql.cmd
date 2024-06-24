@@ -23,12 +23,12 @@ echo.
 echo alter user %ORACLE_APEX_SCHEMA% account unlock;
 echo alter user %ORACLE_APEX_SCHEMA% identified by admin;
 echo.
+echo.
 echo CONNECT %ORACLE_APEX_SCHEMA%/admin
+echo.
 echo @download\sdbm_apex_f101.release.0.32.1.sql
 echo @download\sdbm_apex_f111.release.0.32.1.sql
 echo @download\sdbm_apex_f101.static_file.sql
-echo DISCONNECT
-echo.
 echo.
 echo alter user %ORACLE_APEX_SCHEMA% account lock;
 echo alter user SDBM        account lock;
