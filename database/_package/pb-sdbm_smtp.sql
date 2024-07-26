@@ -15,7 +15,7 @@ IS
 **********************************************************************/
 /*********************************************************************
   PACKAGE : SDBM_SMTP
-  AUTEUR  : Benoit Bouthillier 2009-10-02 (2024-04-23)
+  AUTEUR  : Benoit Bouthillier 2009-10-02 (2024-07-26)
  ---------------------------------------------------------------------
   BUT : Ce package permet l'implantation des procédures utilitaire
         SMTP pour le moniteur Oracle.
@@ -28,7 +28,7 @@ IS
     *****************************************************************/
 
     -- Version du corps PL/SQL
-    VERSION_PB CONSTANT VARCHAR2(4 CHAR) := '0.07';
+    VERSION_PB CONSTANT VARCHAR2(4 CHAR) := '0.08';
 
 
    /******************************************************************
@@ -50,7 +50,7 @@ IS
     ------------------------------------------------------------------
      BUT : Cette procédure à pour but de retourner la version de
            de l'entête PL/SQL et du code de ce package Oracle.
-   
+
            Particularité:
               SERVEROUTPUT doit être activé
 
@@ -76,11 +76,11 @@ IS
 
    /******************************************************************
      PROCEDURE : ENVOYER_SMTP
-     AUTEUR    : Benoit Bouthillier 2010-06-03 (2024-04-23)
+     AUTEUR    : Benoit Bouthillier 2010-06-03 (2024-07-26)
     ------------------------------------------------------------------
      BUT : Cette procédure à pour but de procéder à l'envoi d'un
            courriel.
-   
+
      PARAMETRES: Adresse de courriel - destinataire  (A_DESTINATAIRE)
                  Sujet                               (A_SUJET)
                  Corps du message                    (A_MESSAGE)
@@ -101,11 +101,9 @@ IS
       --
       -- Constantes
       --
-      
+
       -- Frontière MIME MULTIPART
-      BOUNDARY   CONSTANT VARCHAR2(50 CHAR)   := '-----7D81B75CCC90D2974F7A1CBD';
-      F_BOUNDARY CONSTANT VARCHAR2(50 CHAR)   := '--' || BOUNDARY         || UTL_TCP.CRLF;
-      L_BOUNDARY CONSTANT VARCHAR2(50 CHAR)   := '--' || BOUNDARY || '--' || UTL_TCP.CRLF;
+      BOUNDARY   CONSTANT VARCHAR2(50 CHAR) := 'BOUNDARYW4JEEIY368T851U5C4X1BOUNDARY';
 
       -- Definition MIME MULTIPART
       MP_MI_SIZE CONSTANT BINARY_INTEGER := 2016;
@@ -131,7 +129,7 @@ IS
       V_IND_SORTIE         BOOLEAN             := FALSE;
       V_POS_INIT           NUMBER(4)           := 0;
       V_POS_TRAI           NUMBER(4)           := 0;
-      
+
       V_TAMPON_MESSAGE     CLOB;
       V_GROSSEUR_BLOB      NUMBER;
       V_GROSSEUR_MP        BINARY_INTEGER := MP_MI_SIZE;
@@ -143,7 +141,7 @@ IS
 
       -- Vérification si l'erreur était commune
       V_TS_CURRENT := SYSTIMESTAMP AT TIME ZONE 'UTC';
-       
+
       IF ((G_TS_LAST_ERREUR IS NOT NULL) AND (EXTRACT(  HOUR FROM (V_TS_CURRENT - G_TS_LAST_ERREUR)) * 3600
                                             + EXTRACT(MINUTE FROM (V_TS_CURRENT - G_TS_LAST_ERREUR)) *   60
                                             + EXTRACT(SECOND FROM (V_TS_CURRENT - G_TS_LAST_ERREUR)) *    1 < 30)) THEN
@@ -160,38 +158,38 @@ IS
             ,EXPEDITEUR_SMTP
             ,STARTTLS_SMTP
             ,CHEMIN_WALLET_SMTP
-	    ,MDP_WALLET_SMTP
+            ,MDP_WALLET_SMTP
         INTO V_SERVEUR_SMTP
             ,V_PORT_SMTP
             ,V_NOM_USAGER_SMTP
             ,V_MDP_USAGER_SMTP
             ,V_EXPEDITEUR_SMTP
-	    ,V_STARTTLS_SMTP
-	    ,V_CHEMIN_WALLET_SMTP
-	    ,V_MDP_WALLET_SMTP
+            ,V_STARTTLS_SMTP
+            ,V_CHEMIN_WALLET_SMTP
+            ,V_MDP_WALLET_SMTP
         FROM PARAMETRE;
-       
+
       -- Ouverture de la connexion au serveur de courriel
       IF (V_STARTTLS_SMTP = 'FA') THEN
 
          V_CONNEXION := UTL_SMTP.OPEN_CONNECTION(V_SERVEUR_SMTP,V_PORT_SMTP);
-	
-         -- Engage la conversation
-	 UTL_SMTP.HELO(V_CONNEXION,SYS_CONTEXT('USERENV','SERVER_HOST'));
 
-      ELSE	
-			       
+         -- Engage la conversation
+         UTL_SMTP.HELO(V_CONNEXION,SYS_CONTEXT('USERENV','SERVER_HOST'));
+
+      ELSE
+
          V_CONNEXION := UTL_SMTP.OPEN_CONNECTION(HOST            => V_SERVEUR_SMTP
                                                 ,PORT            => V_PORT_SMTP
                                                 ,WALLET_PATH     => V_CHEMIN_WALLET_SMTP
-                                                ,WALLET_PASSWORD => SDBM_UTIL.DECRYPTER_MDP_SMTP(V_CHEMIN_WALLET_SMTP,V_MDP_WALLET_SMTP) 
+                                                ,WALLET_PASSWORD => SDBM_UTIL.DECRYPTER_MDP_SMTP(V_CHEMIN_WALLET_SMTP,V_MDP_WALLET_SMTP)
                                                 );
          -- Engage la conversation
          UTL_SMTP.HELO(V_CONNEXION,SYS_CONTEXT('USERENV','SERVER_HOST'));
          UTL_SMTP.STARTTLS(V_CONNEXION);
 
       END IF;
- 
+
       -- Authentification (si requis)
       IF (V_NOM_USAGER_SMTP IS NOT NULL AND V_MDP_USAGER_SMTP IS NOT NULL) THEN
 
@@ -208,7 +206,7 @@ IS
 
       -- Définition du destinataire (bris au ;)
       WHILE(V_IND_SORTIE = FALSE) LOOP
-       
+
          -- Position du ; s'il y a lieu
          V_POS_TRAI := V_POS_INIT + INSTR(SUBSTR(V_DESTINATAIRE,V_POS_INIT+1),';');
          DBMS_OUTPUT.PUT_LINE('POS_INIT = ' || V_POS_INIT);
@@ -222,53 +220,45 @@ IS
             -- Jusqu'au ;
             UTL_SMTP.RCPT(V_CONNEXION,SUBSTR(V_DESTINATAIRE,V_POS_INIT+1,V_POS_TRAI-1 - V_POS_INIT));
          END IF;
-       
+
          -- Ajustement de la position de départ
          V_POS_INIT := V_POS_TRAI;
 
       END LOOP;
-       
+
       -- Ouverture du flux de données
       UTL_SMTP.OPEN_DATA(V_CONNEXION);
 
-      -- Pour permettre l'envoi de caractères spéciaux (accents)
-      UTL_SMTP.WRITE_DATA(V_CONNEXION,'MIME-version: 1.0'                                  || UTL_TCP.CRLF); 
-       
-      -- Type MIME
-      IF (A_BLB_FICHIER IS NULL) THEN
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: text/plain; charset=UTF-8'         || UTL_TCP.CRLF);
-      ELSE
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: ' || MP_MI_TYPE                    || UTL_TCP.CRLF);
-      END IF;
-
-      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Transfer-Encoding: 8bit'                    || UTL_TCP.CRLF); 
-      UTL_SMTP.WRITE_DATA(V_CONNEXION,'X-Mailer: SDBM_SMTP@' || SYS_CONTEXT('USERENV','SERVER_HOST') || UTL_TCP.CRLF); 
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'X-Mailer: SDBM_SMTP@' || SYS_CONTEXT('USERENV','SERVER_HOST') || UTL_TCP.CRLF);
 
       -- Envoi du message (entête)
       UTL_SMTP.WRITE_DATA(V_CONNEXION,'From: "'   || V_EXPEDITEUR_SMTP || '" <' || V_EXPEDITEUR_SMTP || '>' || UTL_TCP.CRLF);
       UTL_SMTP.WRITE_DATA(V_CONNEXION,'To: "'     || V_DESTINATAIRE    || '" <' || V_DESTINATAIRE    || '>' || UTL_TCP.CRLF);
 
-      -- Validation pour longeur du sujet du courriel 
+      -- Validation pour longeur du sujet du courriel
       IF (LENGTH(A_SUJET) > C_MAX_LONG_SUJET) THEN
          V_SUJET := SUBSTR(A_SUJET,1,C_MAX_LONG_SUJET-3) || '...';
       ELSE
-	 V_SUJET := A_SUJET;
+         V_SUJET := A_SUJET;
       END IF;
-      
+
       -- Utilisation de ISO8859-1 pour permettre à la longueur de ne pas être variable dû aux accents
       UTL_SMTP.WRITE_DATA(V_CONNEXION,'Subject: =?ISO8859-1?Q?' || UTL_RAW.CAST_TO_VARCHAR2(UTL_ENCODE.QUOTED_PRINTABLE_ENCODE(UTL_RAW.CAST_TO_RAW(CONVERT(V_SUJET,'WE8ISO8859P1','UTF8')))) || '?=' || UTL_TCP.CRLF);
 
-      -- Ajout MIME MULTIPART (si requis)
+      -- Pour permettre l'envoi de caractères spéciaux (accents)
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'MIME-version: 1.0' || UTL_TCP.CRLF); 
+       
+      -- Type MULTIPART/MIXED
       IF (A_BLB_FICHIER IS NOT NULL) THEN
-
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,F_BOUNDARY); 
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: text/plain; charset=UTF-8'         || UTL_TCP.CRLF);
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Disposition: inline; filename=""'        || UTL_TCP.CRLF);
-
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: ' || MP_MI_TYPE || UTL_TCP.CRLF);
+         UTL_SMTP.WRITE_DATA(V_CONNEXION, UTL_TCP.CRLF);
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'--' || BOUNDARY || UTL_TCP.CRLF); 
       END IF;
 
-
       -- Envoi du message (corps du message)
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Transfer-Encoding: 8bit'          || UTL_TCP.CRLF); 
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: text/plain; charset=UTF-8'  || UTL_TCP.CRLF);
+      UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Disposition: inline; filename=""' || UTL_TCP.CRLF);
       UTL_SMTP.WRITE_DATA(V_CONNEXION, UTL_TCP.CRLF);
 
       -- Prépration pour utilisation de WRITE_RAW_DATA directement
@@ -285,17 +275,18 @@ IS
 
       -- Envoi du fichier (si requis)
       IF (A_BLB_FICHIER IS NOT NULL) THEN
-         
+
          V_GROSSEUR_BLOB := DBMS_LOB.GETLENGTH(A_BLB_FICHIER);
 
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,F_BOUNDARY); 
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: application/octet'                                     || UTL_TCP.CRLF);
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Disposition: attachment; filename="' || A_NOM_FICHIER || '"' || UTL_TCP.CRLF);
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Transfer-Encoding: base64'                                   || UTL_TCP.CRLF); 
+         UTL_SMTP.WRITE_DATA(V_CONNEXION, UTL_TCP.CRLF);
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'--' || BOUNDARY || UTL_TCP.CRLF); 
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Type: application/octet-stream; name="' || A_NOM_FICHIER || '"' || UTL_TCP.CRLF);
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Disposition: attachment; filename="' || A_NOM_FICHIER || '"'    || UTL_TCP.CRLF);
+         UTL_SMTP.WRITE_DATA(V_CONNEXION,'Content-Transfer-Encoding: base64'                                      || UTL_TCP.CRLF); 
          UTL_SMTP.WRITE_DATA(V_CONNEXION, UTL_TCP.CRLF);
 
          FOR I IN 1 .. CEIL( V_GROSSEUR_BLOB / MP_MI_SIZE ) LOOP
-          
+
             IF (I = CEIL(V_GROSSEUR_BLOB / MP_MI_SIZE)) THEN
                V_GROSSEUR_MP := MOD(V_GROSSEUR_BLOB, MP_MI_SIZE);
 
@@ -305,14 +296,13 @@ IS
                END IF;
 
             END IF;
-      
+
             DBMS_LOB.READ(A_BLB_FICHIER, V_GROSSEUR_MP, (I-1) * MP_MI_SIZE + 1, V_TAMPON_MP);
             UTL_SMTP.WRITE_RAW_DATA(V_CONNEXION,UTL_ENCODE.BASE64_ENCODE(V_TAMPON_MP));
 
          END LOOP;
 
          UTL_SMTP.WRITE_DATA(V_CONNEXION, UTL_TCP.CRLF);
-         UTL_SMTP.WRITE_DATA(V_CONNEXION,L_BOUNDARY); 
 
       END IF;
 
@@ -326,7 +316,7 @@ IS
    EXCEPTION
 
       WHEN OTHERS THEN
-         
+
          -- Sauvegarde du message actuel
          V_SQLERRM := SUBSTR(SQLERRM,1,512);
 
@@ -337,12 +327,12 @@ IS
             WHEN OTHERS THEN
                NULL;
          END;
-         
+
          -- Vérification pour problème générale avec SMTP (éviter un HANG sur Oracle XE)
          IF (V_SQLERRM = 'ORA-29278: SMTP transient error: 421 Service not available') THEN
             G_TS_LAST_ERREUR := SYSTIMESTAMP AT TIME ZONE 'UTC';
          END IF;
-         
+
          -- Retour de l'erreur originale
          RAISE_APPLICATION_ERROR(-20000,'SDBM_SMTP : ' || V_SQLERRM);
 
