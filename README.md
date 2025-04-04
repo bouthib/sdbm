@@ -33,7 +33,7 @@ Le serveur de gestion fonctionne sans aucune installation sur vos serveurs de ba
 
 ### Installation simple via "Releases"
 
-Le fichier "release" est diponible pour permettre l'installation la plus simple possible.  Avec cette façon, certains composants comme les services Java sont pré-compilés.  **Il est aussi à noter que c'est la seule façon possible pour obtenir tout les utilitaires requis pour procéder à une installation sur Windows**.  Si vous n'avez pas l'intention de modifier le code Java, cette méthode est recommandée.
+Le fichier "release" est disponible pour permettre l'installation la plus simple possible.  Avec cette façon, certains composants comme les services Java sont pré-compilés.  **Il est aussi à noter que c'est la seule façon possible pour obtenir tout les utilitaires requis pour procéder à une installation sur Windows**.  Si vous n'avez pas l'intention de modifier le code Java, cette méthode est recommandée.
 
 #### Linux
 
